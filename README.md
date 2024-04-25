@@ -1,2 +1,2 @@
-# ansible-formation
-Repo pour suivre notre formation Ansible https://elearning.rousseltm.fr 
+# Ansible
+Repo pour suivre notre formation Ansible sur notre site https://elearning.rousseltm.fr 
