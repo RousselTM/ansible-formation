@@ -1,0 +1,83 @@
+# Auto install
+deploy_ansible = ENV['DEPLOY_ANSIBLE'] || false
+deploy_docker = ENV['DEPLOY_ANSIBLE'] || false
+
+# Hosts 
+hosts=[
+  {
+    :hostname => "rousseltm-ansible-v01",
+    :ip => "192.168.0.5",
+    :box => "bento/debian-12",
+    :ram => 2048,
+    :cpu => 2,
+    :ansible_install => true
+  },
+  {
+    :hostname => "rousseltm-ansible-v02",
+    :ip => "192.168.0.6",
+    :box => "bento/ubuntu-24.04",
+    :ram => 1048,
+    :cpu => 1,
+    :ansible_install => false
+  },
+  {
+    :hostname => "rousseltm-ansible-v03",
+    :ip => "192.168.0.7",
+    :box => "bento/rockylinux-9",
+    :ram => 1048,
+    :cpu => 1,
+    :ansible_install => false
+  }
+]
+
+
+#Create config for /etc/hosts
+if deploy_ansible
+    File.open("./hosts", 'w') { |file| 
+        file.write("\n\n#ROUSSELTM - Add by Vagrant\n\n192.168.0.5 ansible ansible.rousseltm.fr\n\n")
+        hosts.each do |i|
+            file.write("#{i[:ip]} #{i[:hostname]} #{i[:hostname]}.rousseltm.fr\n")
+        end
+    }
+end
+
+
+Vagrant.configure("2") do |config|
+    
+    #Création des machines 
+    hosts.each do |host| 
+        config.vm.define host[:hostname] do |i|
+            i.vm.box = host[:box]
+            i.vm.hostname = host[:hostname]
+            i.vm.network "private_network", ip: host[:ip]
+            
+            #Use google DNS
+            i.vm.provision "init", type: "shell", inline: "sed -i 's/10.0.2.3/8.8.8.8/g' /etc/resolv.conf", privileged: true
+            
+            #Install Docker if asked
+            if deploy_docker
+                config.vm.provision "docker"
+            end
+            
+             
+            
+            #Install and test ansible if asked 
+            if deploy_ansible
+                
+                #Update /etc/hosts
+                if File.file?("./hosts")
+                    i.vm.provision "file", source: "hosts", destination: "/tmp/hosts"
+                    i.vm.provision "shell", inline: "cat /tmp/hosts >> /etc/hosts", privileged: true
+                end
+
+                if host[:ansible_install]
+                    config.vm.provision "ansible", after: "init", type: "ansible_local" do |ansible|
+                        ansible.playbook = "simple.yaml"
+                    end
+                end
+            end
+
+        end 
+    end
+
+end
